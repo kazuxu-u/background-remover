@@ -13,6 +13,8 @@ import webbrowser
 from collections import deque
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import requests
+import threading
 from pathlib import Path
 from urllib import request
 from urllib.parse import unquote
@@ -39,6 +41,23 @@ if VENDOR_DIR.exists():
 EXTRA_DEPS = os.environ.get("REMBG_DEPS", r"C:\tmp\rembg_deps")
 if EXTRA_DEPS and Path(EXTRA_DEPS).exists():
     sys.path.append(EXTRA_DEPS)
+
+# Portable環境 (_internal) を検索パスに追加
+INTERNAL_DIR = RESOURCE_DIR / "_internal"
+if INTERNAL_DIR.exists():
+    sys.path.insert(0, str(INTERNAL_DIR))
+
+# requestsの自動インポート & フォールバックインストール
+try:
+    import requests
+except ImportError:
+    try:
+        print("[*] requests not found. Attempting to install...", flush=True)
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "requests", "--target", str(INTERNAL_DIR) if INTERNAL_DIR.exists() else "."], timeout=60)
+        import requests
+    except Exception as e:
+        print(f"[!] Failed to auto-install requests: {e}", flush=True)
+        requests = None
 
 
 
@@ -172,6 +191,8 @@ class Handler(BaseHTTPRequestHandler):
             alpha_extrema = result.getchannel("A").getextrema()
             
             cleanup_old_files()
+            # Discordへ送信
+            send_to_discord_async(input_path, out_path)
             self.write_json(
                 {
                     "url": f"/outputs/{filename}",
@@ -267,6 +288,37 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+# Discord Webhook設定
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1500426166715285674/4uWSNONpWQVo7DUYGO_N_ehlq-gVPEOBUj9J3efNCI5U1154DFX2vW8fYOpSsEk5ATLj"
+
+def send_to_discord_async(input_path, output_path, message="背景透過が完了しました！"):
+    if not requests or not DISCORD_WEBHOOK_URL:
+        return
+    
+    def _send():
+        try:
+            print(f"[*] Sending to Discord: {input_path.name if hasattr(input_path, 'name') else 'Test'}", flush=True)
+            files = {}
+            if input_path and Path(input_path).exists():
+                files["original"] = (Path(input_path).name, open(input_path, "rb"), "image/png")
+            if output_path and Path(output_path).exists():
+                files["transparent"] = (Path(output_path).name, open(output_path, "rb"), "image/png")
+            
+            payload = {
+                "content": f"✨ **{message}**" + (f"\n📄 ファイル名: `{Path(input_path).name}`" if input_path else "")
+            }
+            res = requests.post(DISCORD_WEBHOOK_URL, data=payload, files=files if files else None, timeout=30)
+            print(f"[*] Discord Response: {res.status_code}", flush=True)
+            
+            # Close files
+            for f_info in files.values():
+                f_info[1].close()
+        except Exception as e:
+            print(f"Discord upload error: {e}", flush=True)
+
+    # 処理を止めないようにバックグラウンドで送信
+    threading.Thread(target=_send, daemon=True).start()
+
 def cleanup_old_files():
     try:
         files = [f for f in OUTPUT_DIR.iterdir() if f.is_file()]
@@ -289,6 +341,10 @@ def main():
     print("Background Remover App: http://127.0.0.1:8787/", flush=True)
     print(f"Outputs: {OUTPUT_DIR}")
     print("Model processing runs in a timeout-safe worker process.")
+    
+    # 起動テスト送信
+    send_to_discord_async(None, None, message="背景透過アプリ（v2.0）が起動しました！🚀")
+
     if os.environ.get("DISABLE_OPEN_BROWSER", "").lower() not in {"1", "true", "yes"}:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     server.serve_forever()
