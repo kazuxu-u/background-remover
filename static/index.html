@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>背景透過アプリ</title>
+    <link rel="stylesheet" href="/static/styles.css?v=20260429-save-notice" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="workspace">
+        <div class="toolbar glass-panel">
+          <div class="title-info">
+            <h1>背景透過 <small style="font-size: 0.5em; color: #aaa;">v1.7</small></h1>
+            <p>写真をPNGの透明背景に変換します。</p>
+          </div>
+          <div class="actions">
+
+            <div class="slider-group">
+              <span class="slider-label">枠削り:</span>
+              <input id="erosionSlider" type="range" min="-30" max="10" value="-3" step="1" />
+              <span id="erosionValue">-3</span>
+            </div>
+            <button id="regenerateButton" type="button" style="margin-right: 8px; padding: 6px 16px; border-radius: 6px; border: none; background: #6366f1; color: white; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);" disabled>もう一度生成</button>
+            <button id="clearButton" class="icon-button" type="button" title="クリア" aria-label="クリア">
+              <span>×</span>
+            </button>
+          </div>
+        </div>
+
+
+
+
+
+        <div id="status" class="status" aria-live="polite"></div>
+
+        <div class="preview-grid">
+          <section class="preview-panel glass-panel">
+            <div class="panel-head">
+              <h2>元画像</h2>
+            </div>
+            <label id="dropZone" class="preview-stage" style="cursor: pointer; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed rgba(255,255,255,0.3); border-radius: 8px; overflow: hidden; min-height: 300px; transition: all 0.3s ease;">
+              <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" style="display: none;" />
+              
+              <div id="dropZoneContent" style="text-align: center; color: rgba(255,255,255,0.8);">
+                <span style="font-size: 3rem; display: block; margin-bottom: 8px;">＋</span>
+                <strong style="display: block; font-size: 1.2rem;">画像を選択</strong>
+                <small style="opacity: 0.7;">またはここにドラッグ</small>
+              </div>
+
+              <img id="sourcePreview" alt="" style="display: none; width: 100%; height: 100%; object-fit: contain; position: absolute; top: 0; left: 0; z-index: 10; pointer-events: none; background: rgba(0,0,0,0.4);" />
+            </label>
+          </section>
+
+          <section class="preview-panel glass-panel">
+            <div class="panel-head">
+              <h2 style="display: flex; align-items: center; gap: 8px;">透過PNG <span id="progressText" style="font-size: 0.9rem; color: var(--accent);" hidden>0%</span></h2>
+              <div class="save-actions">
+                <span id="saveNotice" class="save-notice" hidden>保存しました</span>
+                <button id="saveButton" class="download" type="button" hidden>保存</button>
+              </div>
+            </div>
+            <div class="preview-stage checker">
+              <img id="resultPreview" alt="" />
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+    <div id="toast" class="toast" hidden>保存しました</div>
+    <script src="/static/app.js?v=2.0"></script>
+  </body>
+</html>

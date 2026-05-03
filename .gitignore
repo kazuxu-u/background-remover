@@ -1,0 +1,16 @@
+outputs/
+__pycache__/
+*.pyc
+.env
+venv/
+env/
+dist/
+build/
+*.spec
+_internal/
+vendor/
+vendor_cpu/
+models/
+scratch/
+*.log
+*.pid
