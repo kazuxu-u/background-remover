@@ -113,6 +113,14 @@ class Handler(BaseHTTPRequestHandler):
             comfy_filename = None
 
             # Process locally via worker_remove.py
+            # Render（メモリ512MB）対策：高精度でもbirefnetは重すぎるのでisnet-general-useにフォールバック
+            is_render = os.environ.get("RENDER") == "true"
+            selected_model = "isnet-general-use"
+            if high_quality and not is_render:
+                selected_model = "birefnet-general"
+            elif not high_quality:
+                selected_model = "u2netp"
+
             worker_script = RESOURCE_DIR / "worker_remove.py"
             cmd = [
                 sys.executable,
@@ -120,7 +128,7 @@ class Handler(BaseHTTPRequestHandler):
                 "--input", str(input_path),
                 "--output", str(out_path),
                 "--provider", os.environ.get("REMBG_PROVIDER", "cpu"),
-                "--model", "birefnet-general" if high_quality else os.environ.get("REMBG_MODEL", "isnet-general-use"),
+                "--model", selected_model,
                 "--max-edge", os.environ.get("REMBG_MAX_EDGE", "1024"),
             ]
             if high_quality:
