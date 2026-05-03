@@ -11,7 +11,7 @@
       <section class="workspace">
         <div class="toolbar glass-panel">
           <div class="title-info">
-            <h1>背景透過 <small style="font-size: 0.5em; color: #aaa;">v1.7</small></h1>
+            <h1>背景透過 <small style="font-size: 0.5em; color: #aaa;">v1.8</small></h1>
             <p>写真をPNGの透明背景に変換します。</p>
           </div>
           <div class="actions">
@@ -39,17 +39,17 @@
             <div class="panel-head">
               <h2>元画像</h2>
             </div>
-            <label id="dropZone" class="preview-stage" style="cursor: pointer; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed rgba(255,255,255,0.3); border-radius: 8px; overflow: hidden; min-height: 300px; transition: all 0.3s ease;">
+            <div id="dropZone" class="preview-stage" style="cursor: pointer; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed rgba(255,255,255,0.3); border-radius: 8px; overflow: hidden; min-height: 300px; transition: all 0.3s ease;">
               <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" style="display: none;" />
               
-              <div id="dropZoneContent" style="text-align: center; color: rgba(255,255,255,0.8);">
+              <div id="dropZoneContent" style="text-align: center; color: rgba(255,255,255,0.8); pointer-events: none;">
                 <span style="font-size: 3rem; display: block; margin-bottom: 8px;">＋</span>
                 <strong style="display: block; font-size: 1.2rem;">画像を選択</strong>
                 <small style="opacity: 0.7;">またはここにドラッグ</small>
               </div>
 
               <img id="sourcePreview" alt="" style="display: none; width: 100%; height: 100%; object-fit: contain; position: absolute; top: 0; left: 0; z-index: 10; pointer-events: none; background: rgba(0,0,0,0.4);" />
-            </label>
+            </div>
           </section>
 
           <section class="preview-panel glass-panel">
