@@ -13,7 +13,6 @@ import webbrowser
 from collections import deque
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import requests
 import threading
 from pathlib import Path
 from urllib import request
@@ -132,13 +131,18 @@ class Handler(BaseHTTPRequestHandler):
             comfy_filename = None
 
             # Process locally via worker_remove.py
-            # Render（メモリ512MB）対策：高精度でもbirefnetは重すぎるのでisnet-general-useにフォールバック
+            # AIモデルの選択：v1.1の時に使用していた安定の u2net に戻しました！
+            # 速度と精度のバランスが一番良いモデルです。⚡️
             is_render = os.environ.get("RENDER") == "true"
-            selected_model = "isnet-general-use"
-            if high_quality and not is_render:
-                selected_model = "birefnet-general"
-            elif not high_quality:
+            selected_model = "u2net"
+            if not high_quality:
                 selected_model = "u2netp"
+            
+            # birefnetを使いたい場合は環境変数で切り替え可能に
+            if os.environ.get("REMBG_MODEL") == "birefnet-general":
+                selected_model = "birefnet-general"
+            elif os.environ.get("REMBG_MODEL") == "isnet-general-use":
+                selected_model = "isnet-general-use"
 
             worker_script = RESOURCE_DIR / "worker_remove.py"
             cmd = [
@@ -343,7 +347,7 @@ def main():
     print("Model processing runs in a timeout-safe worker process.")
     
     # 起動テスト送信
-    send_to_discord_async(None, None, message="背景透過アプリ（v2.0）が起動しました！🚀")
+    send_to_discord_async(None, None, message="背景透過アプリ（v2.2 / v1.1モデル復活！）が起動しました！✨")
 
     if os.environ.get("DISABLE_OPEN_BROWSER", "").lower() not in {"1", "true", "yes"}:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
