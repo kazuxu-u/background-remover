@@ -11,16 +11,29 @@
       <section class="workspace">
         <div class="toolbar glass-panel">
           <div class="title-info">
-            <h1>背景透過 <small style="font-size: 0.5em; color: #aaa;">v2.2</small></h1>
+            <h1>背景透過 <small style="font-size: 0.5em; color: #aaa;">v3.0</small></h1>
             <p>写真をPNGの透明背景に変換します。</p>
           </div>
-          <div class="actions">
-
-            <div class="slider-group">
-              <span class="slider-label">枠削り:</span>
-              <input id="erosionSlider" type="range" min="-30" max="10" value="-3" step="1" />
-              <span id="erosionValue">-3</span>
+          <div class="controls glass-panel">
+            <div class="control-group">
+              <label for="modelSelect">AIモデル:</label>
+              <select id="modelSelect" class="glass-select">
+                <option value="u2net" selected>標準 (u2net - 安定)</option>
+                <option value="isnet-general-use">高精度 (isnet - クッキリ)</option>
+                <option value="birefnet-general">最高品質 (birefnet - 重め)</option>
+                <option value="silueta">人物特化 (silueta - 高速)</option>
+                <option value="u2netp">最速 (u2netp - 軽量)</option>
+              </select>
             </div>
+            <div class="control-group">
+              <label for="erosion">枠削り:</label>
+              <div class="slider-container">
+                <input type="range" id="erosion" min="-15" max="15" value="-3">
+                <span id="erosionValue">-3</span>
+              </div>
+            </div>
+          </div>
+          <div class="actions">
             <button id="regenerateButton" type="button" style="margin-right: 8px; padding: 6px 16px; border-radius: 6px; border: none; background: #6366f1; color: white; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);" disabled>もう一度生成</button>
             <button id="clearButton" class="icon-button" type="button" title="クリア" aria-label="クリア">
               <span>×</span>

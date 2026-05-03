@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const erosionSlider = document.querySelector("#erosionSlider");
     const erosionValueDisplay = document.querySelector("#erosionValue");
     const regenerateButton = document.querySelector("#regenerateButton");
+    const modelSelect = document.querySelector("#modelSelect");
 
     let currentFile = null;
     let progressTimer = null;
@@ -110,6 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const form = new FormData();
             form.append("highQuality", "true");
             form.append("erosion", erosion);
+            form.append("model", modelSelect ? modelSelect.value : "u2net");
             form.append("image", file);
 
             const data = await new Promise((resolve, reject) => {
@@ -174,15 +176,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (clearButton) clearButton.addEventListener("click", clear);
     if (saveButton) {
-        saveButton.addEventListener("click", () => {
+        saveButton.addEventListener("click", async () => {
             if (!latestFilename) return;
+            
+            // 1. ブラウザにダウンロード
             const link = document.createElement("a");
             link.href = resultPreview.src;
             link.download = latestFilename;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            setStatus("ダウンロードを開始しました");
+            
+            // 2. サーバーに「保存確定」を伝える
+            try {
+                const res = await fetch("/api/save", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ filename: latestFilename })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    setStatus("保存しました！ (outputsフォルダに格納完了)");
+                } else {
+                    setStatus(data.error || "保存に失敗しました", true);
+                }
+            } catch (e) {
+                console.error(e);
+            }
         });
     }
     if (regenerateButton) {

@@ -30,7 +30,9 @@ else:
 
 STATIC_DIR = RESOURCE_DIR / "static"
 OUTPUT_DIR = APP_DIR / "outputs"
+PREVIEW_DIR = OUTPUT_DIR / "previews"
 OUTPUT_DIR.mkdir(exist_ok=True)
+PREVIEW_DIR.mkdir(exist_ok=True)
 SAVE_DIR = Path(os.environ.get("CUTOUT_SAVE_DIR", r"C:\Users\momop\OneDrive\画像\切り抜き"))
 
 VENDOR_DIR = RESOURCE_DIR / "vendor"
@@ -81,6 +83,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path.startswith("/outputs/"):
             target = OUTPUT_DIR / path.removeprefix("/outputs/")
+            # outputs直下になければpreviewsを探す
+            if not target.exists():
+                target = PREVIEW_DIR / path.removeprefix("/outputs/")
             self.serve_static(target)
             return
         self.send_error(HTTPStatus.NOT_FOUND, "Not found")
@@ -116,33 +121,29 @@ class Handler(BaseHTTPRequestHandler):
             high_quality_raw = form.getfirst("highQuality", "false")
             high_quality = high_quality_raw == "true"
             erosion = int(form.getfirst("erosion", "-3"))
-            print(f"[*] Request received: high_quality={high_quality}, erosion={erosion}", flush=True)
+            requested_model = form.getfirst("model", "u2net")
+            print(f"[*] Request received: model={requested_model}, erosion={erosion}", flush=True)
             from PIL import Image
 
             source = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
 
             safe_stem = Path(getattr(field, "filename", "") or "image").stem[:40] or "image"
             filename = f"{int(time.time())}_{uuid.uuid4().hex[:8]}_{safe_stem}_transparent.png"
-            out_path = OUTPUT_DIR / filename
-            input_path = OUTPUT_DIR / f"{int(time.time())}_{uuid.uuid4().hex[:8]}_comfy_input.png"
+            out_path = PREVIEW_DIR / filename # 一旦プレビュー用フォルダに保存
+            input_path = PREVIEW_DIR / f"{int(time.time())}_{uuid.uuid4().hex[:8]}_comfy_input.png"
             source.save(input_path)
 
             provider_name = "unknown"
             comfy_filename = None
 
             # Process locally via worker_remove.py
-            # AIモデルの選択：v1.1の時に使用していた安定の u2net に戻しました！
-            # 速度と精度のバランスが一番良いモデルです。⚡️
-            is_render = os.environ.get("RENDER") == "true"
-            selected_model = "u2net"
-            if not high_quality:
-                selected_model = "u2netp"
+            # AIモデルの選択：画面で選んだモデルを使用
+            selected_model = requested_model
             
-            # birefnetを使いたい場合は環境変数で切り替え可能に
-            if os.environ.get("REMBG_MODEL") == "birefnet-general":
-                selected_model = "birefnet-general"
-            elif os.environ.get("REMBG_MODEL") == "isnet-general-use":
-                selected_model = "isnet-general-use"
+            # 安全のため、特定のモデル名以外はデフォルトに戻す（オプション）
+            valid_models = ["u2net", "u2netp", "isnet-general-use", "birefnet-general", "silueta"]
+            if selected_model not in valid_models:
+                selected_model = "u2net"
 
             worker_script = RESOURCE_DIR / "worker_remove.py"
             cmd = [
@@ -225,25 +226,24 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}
             filename = Path(str(payload.get("filename", ""))).name
             if not filename:
-                self.write_json({"error": "保存するファイルがありません。"}, HTTPStatus.BAD_REQUEST)
+                self.write_json({"error": "保存するファイル名がありません。"}, HTTPStatus.BAD_REQUEST)
                 return
 
-            source = (OUTPUT_DIR / filename).resolve()
-            if not str(source).startswith(str(OUTPUT_DIR.resolve())) or not source.exists():
-                self.write_json({"error": "保存対象のPNGが見つかりません。"}, HTTPStatus.NOT_FOUND)
+            # プレビュー用フォルダから画像を探す
+            source = (PREVIEW_DIR / filename).resolve()
+            if not str(source).startswith(str(PREVIEW_DIR.resolve())) or not source.exists():
+                self.write_json({"error": "プレビュー画像が見つかりません。"}, HTTPStatus.NOT_FOUND)
                 return
 
-            SAVE_DIR.mkdir(parents=True, exist_ok=True)
-            destination = SAVE_DIR / filename
-            if destination.exists():
-                stem = destination.stem
-                suffix = destination.suffix
-                index = 2
-                while destination.exists():
-                    destination = SAVE_DIR / f"{stem}-{index}{suffix}"
-                    index += 1
-
+            # outputsフォルダに正式コピー
+            destination = OUTPUT_DIR / filename
             destination.write_bytes(source.read_bytes())
+            
+            # かずぅさんの指定保存先（OneDriveとか）があればそこにもコピー
+            if SAVE_DIR.exists():
+                ext_dest = SAVE_DIR / filename
+                ext_dest.write_bytes(source.read_bytes())
+
             self.write_json(
                 {
                     "message": "保存しました",
@@ -253,11 +253,13 @@ class Handler(BaseHTTPRequestHandler):
             )
         except Exception as exc:
             self.write_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+        except Exception as exc:
+            self.write_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
     def serve_static(self, target: Path):
         try:
             resolved = target.resolve()
-            allowed_roots = (STATIC_DIR.resolve(), OUTPUT_DIR.resolve())
+            allowed_roots = (STATIC_DIR.resolve(), OUTPUT_DIR.resolve(), PREVIEW_DIR.resolve())
             if not any(str(resolved).startswith(str(root)) for root in allowed_roots):
                 self.send_error(HTTPStatus.FORBIDDEN, "Forbidden")
                 return
@@ -325,10 +327,21 @@ def send_to_discord_async(input_path, output_path, message="背景透過が完�
 
 def cleanup_old_files():
     try:
+        # 正式保存されたファイル（outputs）の制限
         files = [f for f in OUTPUT_DIR.iterdir() if f.is_file()]
         if len(files) > 100:
             files.sort(key=lambda x: x.stat().st_mtime)
             for f in files[:-100]:
+                try:
+                    f.unlink()
+                except OSError:
+                    pass
+        
+        # プレビュー用ファイル（previews）は10個超えたらお掃除
+        p_files = [f for f in PREVIEW_DIR.iterdir() if f.is_file()]
+        if len(p_files) > 10:
+            p_files.sort(key=lambda x: x.stat().st_mtime)
+            for f in p_files[:-10]:
                 try:
                     f.unlink()
                 except OSError:
@@ -347,7 +360,7 @@ def main():
     print("Model processing runs in a timeout-safe worker process.")
     
     # 起動テスト送信
-    send_to_discord_async(None, None, message="背景透過アプリ（v2.2 / v1.1モデル復活！）が起動しました！✨")
+    send_to_discord_async(None, None, message="背景透過アプリ（v3.0 / AIモデル選択機能追加！）が起動しました！🎨")
 
     if os.environ.get("DISABLE_OPEN_BROWSER", "").lower() not in {"1", "true", "yes"}:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
